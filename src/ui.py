@@ -1,82 +1,74 @@
 import curses
-from typing import Tuple
-from config import GRID_WIDTH, GRID_HEIGHT, SNAKE_CHAR, FOOD_CHAR, EMPTY_CHAR
-from direction import Direction
+from typing import List, Tuple
+
+from config import GRID_WIDTH, GRID_HEIGHT, FOOD_CHAR, SNAKE_CHAR, EMPTY_CHAR
+from snake import Snake
+
+
+class GameState:
+    def __init__(self, snake: Snake, food: Tuple[int, int], score: int, game_over: bool) -> None:
+        self.snake = snake
+        self.food = food
+        self.score = score
+        self.game_over = game_over
 
 
 class UI:
     def __init__(self) -> None:
-        self.stdscr = curses.initscr()
+        self._stdscr = curses.initscr()
         curses.noecho()
         curses.cbreak()
-        self.stdscr.nodelay(True)
-        self.stdscr.keypad(True)
+        self._stdscr.nodelay(True)
+        self._stdscr.keypad(True)
 
-    def render(self, game_state: dict) -> None:
-        self.stdscr.clear()
-        snake = game_state["snake"]
-        food = game_state["food"]
-        score = game_state["score"]
-
-        board = [[EMPTY_CHAR for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-
-        for x, y in snake.get_body():
-            if 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT:
-                board[y][x] = SNAKE_CHAR
-
-        fx, fy = food
-        if 0 <= fx < GRID_WIDTH and 0 <= fy < GRID_HEIGHT:
-            board[fy][fx] = FOOD_CHAR
-
+    def render(self, game_state: GameState) -> None:
+        self._stdscr.clear()
+        
         for y in range(GRID_HEIGHT):
-            self.stdscr.addstr(y, 0, "".join(board[y]))
-
-        self.stdscr.addstr(GRID_HEIGHT, 0, f"Score: {score}")
-        self.stdscr.refresh()
+            for x in range(GRID_WIDTH):
+                head = game_state.snake.get_head()
+                body = game_state.snake.get_body()
+                if head == (x, y):
+                    self._stdscr.addch(y, x, SNAKE_CHAR)
+                elif body and (x, y) in body:
+                    self._stdscr.addch(y, x, SNAKE_CHAR.lower())
+                elif game_state.food == (x, y):
+                    self._stdscr.addch(y, x, FOOD_CHAR)
+                else:
+                    self._stdscr.addch(y, x, EMPTY_CHAR)
+        
+        self._stdscr.addstr(GRID_HEIGHT + 1, 0, f"Score: {game_state.score}")
+        self._stdscr.refresh()
 
     def get_user_input(self) -> str:
         try:
-            key = self.stdscr.getkey()
+            key = self._stdscr.getkey()
             return key
         except curses.error:
             return ""
 
     def show_game_over(self, score: int) -> None:
-        self.stdscr.nodelay(False)
-        self.stdscr.clear()
-        center_y = GRID_HEIGHT // 2
-        game_over_msg = "GAME OVER"
-        score_msg = f"Final Score: {score}"
-        
-        self.stdscr.addstr(center_y - 1, (GRID_WIDTH - len(game_over_msg)) // 2, game_over_msg)
-        self.stdscr.addstr(center_y, (GRID_WIDTH - len(score_msg)) // 2, score_msg)
-        self.stdscr.addstr(center_y + 2, (GRID_WIDTH - 22) // 2, "Press any key to exit")
-        self.stdscr.refresh()
-        self.stdscr.getch()
+        self._stdscr.clear()
+        self._stdscr.addstr(GRID_HEIGHT // 2, GRID_WIDTH // 2 - 5, "Game Over!")
+        self._stdscr.addstr(GRID_HEIGHT // 2 + 1, GRID_WIDTH // 2 - 6, f"Final Score: {score}")
+        self._stdscr.addstr(GRID_HEIGHT // 2 + 3, GRID_WIDTH // 2 - 11, "Press any key to exit")
+        self._stdscr.refresh()
+        self._stdscr.nodelay(False)
+        self._stdscr.getkey()
 
     def show_instructions(self) -> None:
-        self.stdscr.nodelay(False)
-        self.stdscr.clear()
-        instructions = [
-            "SNAKE GAME",
-            "",
-            "Instructions:",
-            "- Use Arrow keys or WASD to move",
-            "- Eat food (O) to grow and score",
-            "- Avoid hitting walls or yourself",
-            "",
-            "Press any key to start..."
-        ]
-        
-        start_y = (GRID_HEIGHT - len(instructions)) // 2
-        for i, line in enumerate(instructions):
-            self.stdscr.addstr(start_y + i, (GRID_WIDTH - len(line)) // 2, line)
-        
-        self.stdscr.refresh()
-        self.stdscr.getch()
+        self._stdscr.clear()
+        self._stdscr.addstr(0, 0, "Snake Game Instructions")
+        self._stdscr.addstr(2, 0, "Use arrow keys to change direction")
+        self._stdscr.addstr(3, 0, "Collect 'O' to grow and score")
+        self._stdscr.addstr(4, 0, "Don't hit walls or yourself")
+        self._stdscr.addstr(6, 0, "Press any key to start")
+        self._stdscr.refresh()
+        self._stdscr.nodelay(False)
+        self._stdscr.getkey()
 
     def cleanup(self) -> None:
         curses.nocbreak()
-        self.stdscr.keypad(False)
+        self._stdscr.keypad(False)
         curses.echo()
         curses.endwin()
